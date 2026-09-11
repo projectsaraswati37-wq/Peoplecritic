@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import type { HumanAnalysis } from '../types/analysis';
 import AIOrb from './AIOrb';
 import VoiceControls from './VoiceControls';
+import ParodyDashboard from './ParodyDashboard';
 import { speechService } from '../utils/speech';
 import { downloadScanRecord, shareScanRecord } from '../utils/history';
 
@@ -765,6 +766,8 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           </div>
           <ScoreSection score={analysis.overallScore} accent={accentColor} phase={getPhase('overallScore')} />
         </div>
+
+        <ParodyDashboard analysis={analysis} />
 
         <div className="text-center text-xs font-mono opacity-20 mb-4">
           Images are processed locally for this demo and are not stored.
