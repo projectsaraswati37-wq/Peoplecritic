@@ -11,6 +11,7 @@ const ScanAnimation: React.FC<ScanAnimationProps> = ({ imageDataUrl, onComplete 
   const [progress, setProgress] = useState(0);
   const [messages, setMessages] = useState<string[]>([DIAGNOSTIC_MESSAGES[0].text]);
   const [done, setDone] = useState(false);
+  const [scanId] = useState(() => Math.random().toString(36).slice(2, 10).toUpperCase());
   const calledComplete = useRef(false);
 
   const TOTAL_DURATION = DIAGNOSTIC_MESSAGES[DIAGNOSTIC_MESSAGES.length - 1].delay + 600;
@@ -49,7 +50,7 @@ const ScanAnimation: React.FC<ScanAnimationProps> = ({ imageDataUrl, onComplete 
   }, []);
 
   return (
-    <div className="flex flex-col items-center min-h-screen bg-cyber-bg px-4 py-6">
+    <div className="operational-page scanning-page flex flex-col items-center min-h-screen bg-cyber-bg px-4 py-6">
       {/* Title */}
       <div className="text-center mb-4">
         <div className="text-xs font-mono tracking-widest mb-1" style={{ color: '#00d4ff' }}>
@@ -143,7 +144,7 @@ const ScanAnimation: React.FC<ScanAnimationProps> = ({ imageDataUrl, onComplete 
 
       {/* Scan ID */}
       <div className="mt-3 text-xs font-mono opacity-30">
-        SCAN ID: {Math.random().toString(36).slice(2, 10).toUpperCase()}
+        SCAN ID: {scanId}
       </div>
     </div>
   );

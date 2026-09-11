@@ -3,6 +3,7 @@ import type { HumanAnalysis } from '../types/analysis';
 import AIOrb from './AIOrb';
 import VoiceControls from './VoiceControls';
 import { speechService } from '../utils/speech';
+import { downloadScanRecord, shareScanRecord } from '../utils/history';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Reveal phase lifecycle
@@ -372,6 +373,7 @@ interface AnalysisResultsProps {
   onVoiceToggle: () => void;
   onScanAgain: () => void;
   onHome: () => void;
+  onHistory: () => void;
 }
 
 const RARITY_COLORS: Record<string, string> = {
@@ -385,7 +387,7 @@ const RARITY_COLORS: Record<string, string> = {
 const GLITCH_MS = 420;
 
 const AnalysisResults: React.FC<AnalysisResultsProps> = ({
-  analysis, imageDataUrl, voiceEnabled, onVoiceToggle, onScanAgain, onHome,
+  analysis, imageDataUrl, voiceEnabled, onVoiceToggle, onScanAgain, onHome, onHistory,
 }) => {
   const [speaking, setSpeaking] = useState(false);
   const [phases, setPhases]     = useState<Record<string, StatPhase>>({});
@@ -448,7 +450,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
     const say = (text: string, isSetupPhrase = false): Promise<void> => {
       if (!alive()) return Promise.resolve();
       if (voiceRef.current && speechService.isSupported()) {
-        return speechService.speak(text);
+        return speechService.speak(text, { language: 'ml-IN', rate: 0.92, pitch: 1 });
       }
       // No voice: shorter setup wait, longer value wait so animations are visible
       return new Promise(r => setTimeout(r, isSetupPhrase ? 320 : 520));
@@ -461,9 +463,9 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
       // Opening lines (voice only)
       if (voiceRef.current && speechService.isSupported()) {
-        await say('Analysis complete.');
+        await say('വിശകലനം പൂർത്തിയായി.');
         if (analysis.legendaryEvent) {
-          await say(`Warning. ${analysis.legendaryEvent}`);
+          await say('പ്രത്യേക ഫലം കണ്ടെത്തി.');
         }
       } else {
         await wait(500);
@@ -475,38 +477,38 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       const statSteps: { key: StatKey; setup: string; value: string }[] = [
         {
           key:   'npcLevel',
-          setup: 'N P C level:',
-          value: `${analysis.npcLevel} percent.`,
+          setup: 'എൻ പി സി നില:',
+          value: `${analysis.npcLevel} ശതമാനം.`,
         },
         {
           key:   'aura',
-          setup: 'Aura:',
-          value: `${auraSignStr} ${auraAbsStr}.`,
+          setup: 'ഓറ:',
+          value: `${analysis.aura >= 0 ? 'പ്ലസ്' : 'മൈനസ്'} ${auraAbsStr}.`,
         },
         {
           key:   'mainCharacterEnergy',
-          setup: 'Main character energy:',
-          value: `${analysis.mainCharacterEnergy} percent.`,
+          setup: 'മെയിൻ ക്യാരക്ടർ എനർജി:',
+          value: `${analysis.mainCharacterEnergy} ശതമാനം.`,
         },
         {
           key:   'dripLevel',
-          setup: 'Drip level:',
-          value: `${analysis.dripLevel} percent.`,
+          setup: 'സ്റ്റൈൽ നില:',
+          value: `${analysis.dripLevel} ശതമാനം.`,
         },
         {
           key:   'threatLevel',
-          setup: 'Threat level:',
-          value: `${analysis.threatLevel}.`,
+          setup: 'ഭീഷണി നില:',
+          value: 'വിശദാംശങ്ങൾ സ്ക്രീനിൽ കാണാം.',
         },
         {
           key:   'luck',
-          setup: 'Luck:',
-          value: `${analysis.luck >= 0 ? 'plus' : 'minus'} ${Math.abs(analysis.luck)}.`,
+          setup: 'ഭാഗ്യ നില:',
+          value: `${analysis.luck >= 0 ? 'പ്ലസ്' : 'മൈനസ്'} ${Math.abs(analysis.luck)}.`,
         },
         {
           key:   'sideCharacterEnergy',
-          setup: 'Side character energy:',
-          value: `${analysis.sideCharacterEnergy} percent.`,
+          setup: 'സൈഡ് ക്യാരക്ടർ എനർജി:',
+          value: `${analysis.sideCharacterEnergy} ശതമാനം.`,
         },
       ];
 
@@ -527,31 +529,31 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
       // ── Future Career ────────────────────────────────────────────────────
       if (!alive()) return;
       setPhase('futureCareer', 'scanning');
-      await say('Future career:', true);
+      await say('ഭാവിയിലെ കരിയർ:', true);
       if (!alive()) return;
       triggerReveal('futureCareer');
-      await say(`${analysis.futureCareer}.`, false);
+      await say('ഫലം സ്ക്രീനിൽ കാണാം.', false);
 
       // ── AI Final Verdict ─────────────────────────────────────────────────
       if (!alive()) return;
       setPhase('verdict', 'scanning');
-      await say('Final verdict.', true);
+      await say('അവസാന വിധി:', true);
       if (!alive()) return;
       triggerReveal('verdict');
-      await say(analysis.verdict, false);
+      await say('വിധി സ്ക്രീനിൽ കാണാം.', false);
 
       // ── Overall Human Score ──────────────────────────────────────────────
       if (!alive()) return;
       setPhase('overallScore', 'scanning');
-      await say('Overall human score:', true);
+      await say('മൊത്തം സ്കോർ:', true);
       if (!alive()) return;
       triggerReveal('overallScore');
-      await say(`${analysis.overallScore.toFixed(1)} out of ten.`, false);
+      await say(`${analysis.overallScore.toFixed(1)} പത്തിൽ.`, false);
 
       // Closing
       if (alive() && voiceRef.current && speechService.isSupported()) {
         await wait(200);
-        await say('Thank you for participating in this completely unnecessary analysis.');
+        await say('ഈ പൂർണ്ണമായും അനാവശ്യമായ വിശകലനത്തിൽ പങ്കെടുത്തതിന് നന്ദി.');
       }
     })();
   }, [analysis, auraAbsStr, auraSignStr]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -574,10 +576,24 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
 
   const getPhase = (key: string): StatPhase => phases[key] ?? 'locked';
   const allRevealed = ALL_KEYS.every(k => getPhase(k) === 'revealed');
+  const scanRecord = {
+    id: analysis.id,
+    createdAt: analysis.timestamp.toISOString(),
+    analysis,
+    thumbnail: imageDataUrl,
+  };
+  const handleShare = async () => {
+    try {
+      const shared = await shareScanRecord(scanRecord);
+      if (!shared) downloadScanRecord(scanRecord);
+    } catch {
+      // Share cancellation is intentionally quiet.
+    }
+  };
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-cyber-bg grid-bg screen-enter">
+    <div className="operational-page results-page min-h-screen bg-cyber-bg grid-bg screen-enter">
 
       {/* ── Header ── */}
       <div
@@ -593,7 +609,7 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
               PEOPLECRITIQUE AI
             </div>
             <div className="text-xs font-mono opacity-35 tracking-widest">
-              ANALYSIS COMPLETE · {analysis.id}
+              {analysis.source === 'AI' ? 'GEMINI AI ANALYSIS' : 'LOCAL ANALYSIS'} · {analysis.id}
             </div>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -791,6 +807,17 @@ const AnalysisResults: React.FC<AnalysisResultsProps> = ({
           >
             RETURN TO HOME
           </button>
+          <button
+            onClick={onHistory}
+            className="w-full py-2 font-mono text-xs tracking-widest transition-all hover:opacity-70"
+            style={{ color: '#4a6a8c' }}
+          >
+            VIEW SCAN HISTORY
+          </button>
+          <div className="result-secondary-actions">
+            <button className="text-button" onClick={handleShare}>SHARE / DOWNLOAD ↗</button>
+            <span>LOCAL RESULT · NO IDENTITY DATA STORED</span>
+          </div>
         </div>
       </div>
     </div>

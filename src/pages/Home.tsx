@@ -8,6 +8,7 @@ interface HomeProps {
   onVoiceToggle: () => void;
   onStart: (demo?: boolean) => void;
   scanCount: number;
+  onHistory: () => void;
 }
 
 // ── Floating particle ──────────────────────────────────────────────────────────
@@ -33,12 +34,44 @@ function randomParticles(n: number): Particle[] {
   }));
 }
 
-const Home: React.FC<HomeProps> = ({ voiceEnabled, onVoiceToggle, onStart, scanCount }) => {
+const Home: React.FC<HomeProps> = ({ voiceEnabled, onVoiceToggle, onStart, scanCount, onHistory }) => {
   const [speaking, setSpeaking] = useState(false);
-  const particles = useRef(randomParticles(25)).current;
+  const [particles] = useState(() => randomParticles(25));
   const [uptime, setUptime] = useState(0);
   const [demoMode, setDemoMode] = useState(false);
   const startedRef = useRef(false);
+  const homeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const home = homeRef.current;
+    if (!home) return;
+
+    let frame = 0;
+    let nextX = 50;
+    let nextY = 50;
+    const updatePointer = () => {
+      home.style.setProperty('--pointer-x', `${nextX}%`);
+      home.style.setProperty('--pointer-y', `${nextY}%`);
+      home.style.setProperty('--pointer-tilt-x', `${(nextX - 50) / 3}deg`);
+      home.style.setProperty('--pointer-tilt-y', `${(50 - nextY) / 3}deg`);
+      frame = 0;
+    };
+    const handlePointerMove = (event: PointerEvent) => {
+      nextX = (event.clientX / window.innerWidth) * 100;
+      nextY = (event.clientY / window.innerHeight) * 100;
+      if (!frame) frame = requestAnimationFrame(updatePointer);
+      home.classList.add('pointer-active');
+    };
+    const handlePointerLeave = () => home.classList.remove('pointer-active');
+
+    home.addEventListener('pointermove', handlePointerMove);
+    home.addEventListener('pointerleave', handlePointerLeave);
+    return () => {
+      home.removeEventListener('pointermove', handlePointerMove);
+      home.removeEventListener('pointerleave', handlePointerLeave);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
 
   useEffect(() => {
     speechService.setOnSpeakingChange(setSpeaking);
@@ -50,7 +83,8 @@ const Home: React.FC<HomeProps> = ({ voiceEnabled, onVoiceToggle, onStart, scanC
       startedRef.current = true;
       setTimeout(() => {
         speechService.speak(
-          "Welcome to PeopleCritique A I. The world's most unnecessary human analysis system."
+          'നമസ്കാരം. PeopleCritique AI-യിലേക്ക് സ്വാഗതം. നിങ്ങളുടെ മുഖഭാവവും പോസും പരിശോധിക്കാൻ തയ്യാറാണോ?',
+          { language: 'ml-IN', rate: 0.92, pitch: 1.05 }
         );
       }, 600);
     }
@@ -70,33 +104,35 @@ const Home: React.FC<HomeProps> = ({ voiceEnabled, onVoiceToggle, onStart, scanC
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-between overflow-hidden scanlines grid-bg">
+    <div ref={homeRef} className="home-shell interactive-playground scanlines">
+      <div className="home-aurora home-aurora-left" />
+      <div className="home-aurora home-aurora-right" />
+      <div className="playground-cursor" aria-hidden="true" />
+      <div className="playground-hud" aria-hidden="true">
+        <span>POINTER FIELD</span><b>LIVE</b><i />
+      </div>
+      <div className="home-particles" aria-hidden="true">
+        {particles.map((p) => (
+          <span
+            key={p.id}
+            style={{
+              left: `${p.x}%`, top: `${p.y}%`, width: p.size, height: p.size,
+              opacity: p.opacity, animation: `floatUp ${p.duration}s ease-in ${p.delay}s infinite`,
+            }}
+          />
+        ))}
+      </div>
 
-      {/* Floating particles */}
-      {particles.map((p) => (
-        <div
-          key={p.id}
-          className="absolute rounded-full pointer-events-none"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: p.size,
-            height: p.size,
-            background: '#00d4ff',
-            opacity: p.opacity,
-            animation: `floatUp ${p.duration}s ease-in ${p.delay}s infinite`,
-          }}
-        />
-      ))}
-
-      {/* Status bar */}
-      <div className="w-full max-w-lg px-4 pt-4 flex items-center justify-between z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-green-400" style={{ animation: 'blink 2s step-start infinite' }} />
-          <span className="text-xs font-mono text-green-400">ONLINE</span>
+      <header className="home-nav">
+        <div className="brand-lockup">
+          <span className="brand-mark"><AIOrb speaking={speaking} size="sm" /></span>
+          <span>PEOPLECRITIQUE <b>AI</b></span>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono opacity-40">UPTIME {formatUptime(uptime)}</span>
+        <div className="nav-status">
+          <button className="nav-link" onClick={onHistory}>HISTORY</button>
+          <span className="online-dot" /> SYSTEM ONLINE
+          <span className="nav-divider" />
+          <span className="uptime-label">UPTIME {formatUptime(uptime)}</span>
           <VoiceControls
             voiceEnabled={voiceEnabled}
             speaking={speaking}
@@ -104,134 +140,62 @@ const Home: React.FC<HomeProps> = ({ voiceEnabled, onVoiceToggle, onStart, scanC
             onStop={() => speechService.stop()}
           />
         </div>
-      </div>
+      </header>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 z-10 w-full max-w-lg">
-        {/* AI Orb */}
-        <div className="mb-6 pulse-ring rounded-full">
-          <AIOrb speaking={speaking} size="lg" />
-        </div>
-
-        {/* Title */}
-        <div className="text-center mb-8">
-          <div className="text-xs font-mono tracking-[0.4em] mb-2 opacity-60" style={{ color: '#00d4ff' }}>
-            ◆ ADVANCED HUMAN ANALYSIS SYSTEM ◆
-          </div>
-          <h1
-            className="font-mono font-black tracking-[0.15em] mb-3"
-            style={{
-              fontSize: 'clamp(1.6rem, 8vw, 2.8rem)',
-              color: '#00d4ff',
-              textShadow: '0 0 20px rgba(0,212,255,0.6), 0 0 60px rgba(0,212,255,0.2)',
-              lineHeight: 1.1,
-            }}
-          >
-            PEOPLECRITIQUE
-            <span style={{ color: '#00ff88', textShadow: '0 0 20px rgba(0,255,136,0.6)' }}> AI</span>
-          </h1>
-          <p className="font-mono text-sm opacity-60 mb-1">
-            The world's most unnecessary human analysis system.
+      <main className="home-main">
+        <section className="hero-copy">
+          <div className="eyebrow"><span /> ADVANCED HUMAN ANALYSIS SYSTEM <span /></div>
+          <h1>See the person<br /><em>behind the pose.</em></h1>
+          <p className="hero-description">
+            A playful intelligence engine for reading the signals, style, and strange little energies that make someone unmistakably them.
           </p>
-          <p className="font-mono text-xs opacity-40 italic">
-            "Because apparently we needed AI for this."
-          </p>
-        </div>
-
-        {/* CTA button */}
-        <button
-          onClick={() => onStart()}
-          className="w-full max-w-sm py-5 rounded-xl font-mono font-bold text-xl tracking-widest transition-all duration-300 mb-4 glow-blue"
-          style={{
-            background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,255,136,0.1))',
-            border: '2px solid #00d4ff',
-            color: '#00d4ff',
-            boxShadow: '0 0 30px rgba(0,212,255,0.3)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.boxShadow = '0 0 50px rgba(0,212,255,0.5)';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.boxShadow = '0 0 30px rgba(0,212,255,0.3)';
-          }}
-        >
-          ⚡ INITIALIZE HUMAN SCANNER
-        </button>
-
-        {/* Demo mode toggle */}
-        <button
-          onClick={() => {
-            const newDemo = !demoMode;
-            setDemoMode(newDemo);
-            onStart(newDemo);
-          }}
-          className="text-xs font-mono opacity-30 hover:opacity-60 transition-opacity mb-6 underline underline-offset-2"
-          style={{ color: '#ffaa00' }}
-        >
-          {demoMode ? '[ DEMO MODE ACTIVE — CLICK TO START ]' : '[ DEMO MODE ]'}
-        </button>
-
-        {/* Stats row */}
-        <div className="flex gap-6 text-center mb-6">
-          {[
-            { label: 'SCANS TODAY', value: scanCount.toString().padStart(3, '0') },
-            { label: 'ACCURACY', value: '±∞%' },
-            { label: 'USEFULNESS', value: '0%' },
-          ].map((s) => (
-            <div key={s.label}>
-              <div className="font-mono font-bold text-lg" style={{ color: '#00d4ff' }}>{s.value}</div>
-              <div className="text-xs font-mono opacity-40 mt-0.5">{s.label}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Feature chips */}
-        <div className="flex flex-wrap gap-2 justify-center mb-8">
-          {['NPC DETECTION', 'AURA SCAN', 'FUTURE PREDICTION', 'DRIP ANALYSIS', 'THREAT ASSESSMENT'].map((f) => (
-            <span
-              key={f}
-              className="text-xs font-mono px-2.5 py-1 rounded-full border"
-              style={{ borderColor: '#1a3a5c', color: '#4a6a8c', background: 'rgba(0,20,40,0.5)' }}
+          <div className="hero-actions">
+            <button className="primary-action" onClick={() => onStart()}>
+              <span className="action-icon">↗</span> START A LIVE SCAN
+            </button>
+            <button
+              className="secondary-action"
+              onClick={() => { const newDemo = !demoMode; setDemoMode(newDemo); onStart(newDemo); }}
             >
-              {f}
-            </span>
-          ))}
-        </div>
+              {demoMode ? 'DEMO MODE ACTIVE' : 'TRY A DEMO SCAN'} <span>→</span>
+            </button>
+          </div>
+          <p className="privacy-note"><span>✦</span> Camera analysis happens locally. Nothing is stored.</p>
+        </section>
 
-        {/* Disclaimer */}
-        <div
-          className="text-center text-xs font-mono py-3 px-4 rounded-lg border max-w-sm"
-          style={{ borderColor: '#1a3a5c', color: '#4a6a8c', background: 'rgba(0,10,20,0.6)' }}
-        >
-          ⚠ For entertainment purposes only. Results are completely unnecessary.
-          <br />
-          <span className="opacity-50">This system cannot determine any real characteristics.</span>
-        </div>
-      </div>
+        <section className="orb-stage" aria-label="PeopleCritique AI status">
+          <div className="orb-orbit orbit-one" />
+          <div className="orb-orbit orbit-two" />
+          <div className="orb-core"><AIOrb speaking={speaking} size="lg" /></div>
+          <div className="signal-node node-a"><span>01</span><b>AURA</b><small>DETECT</small></div>
+          <div className="signal-node node-b"><span>02</span><b>POSE</b><small>READ</small></div>
+          <div className="signal-node node-c"><span>03</span><b>ENERGY</b><small>MAP</small></div>
+          <div className="orbit-label label-top">SIGNAL / 04 <span>●</span></div>
+          <div className="orbit-label label-bottom">ANALYSIS READY <span>↗</span></div>
+          <div className="stage-caption">THE MOST UNNECESSARY<br />INTELLIGENCE IN THE ROOM</div>
+        </section>
+      </main>
 
-      {/* Footer */}
-      <div className="w-full px-4 pb-6 text-center z-10">
-        <div className="text-xs font-mono opacity-30">
-          AI HUMAN ANALYSIS SYSTEM v2.7.4 • Human Analysis Division
-        </div>
-        <div className="text-xs font-mono opacity-20 mt-1">
-          © PeopleCritique AI — No humans were harmed in the making of this analysis.
-        </div>
-      </div>
+      <section className="insight-strip">
+        <div className="strip-intro"><span className="strip-index">01</span><span>WHAT WE NOTICE</span></div>
+        {[
+          ['01', 'AURA SIGNAL', 'The energy you bring into a room.'],
+          ['02', 'MAIN CHARACTER', 'Your current narrative arc.'],
+          ['03', 'FUTURE TRAJECTORY', 'Where this is all probably going.'],
+        ].map(([index, title, text]) => (
+          <div className="insight-item" key={index}>
+            <span className="insight-number">{index}</span>
+            <div><h2>{title}</h2><p>{text}</p></div>
+            <span className="insight-arrow">↗</span>
+          </div>
+        ))}
+      </section>
 
-      {/* Corner HUD decorations */}
-      <div
-        className="absolute top-0 left-0 w-32 h-32 pointer-events-none opacity-20"
-        style={{
-          background: 'radial-gradient(circle at top left, rgba(0,212,255,0.3), transparent 70%)',
-        }}
-      />
-      <div
-        className="absolute bottom-0 right-0 w-32 h-32 pointer-events-none opacity-20"
-        style={{
-          background: 'radial-gradient(circle at bottom right, rgba(0,255,136,0.2), transparent 70%)',
-        }}
-      />
+      <footer className="home-footer">
+        <span>PEOPLECRITIQUE AI / HUMAN ANALYSIS DIVISION</span>
+        <span>FOR ENTERTAINMENT ONLY · USELESS BY DESIGN</span>
+        <span>{scanCount.toString().padStart(3, '0')} SCANS COMPLETED</span>
+      </footer>
     </div>
   );
 };

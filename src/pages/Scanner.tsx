@@ -24,7 +24,8 @@ const Scanner: React.FC<ScannerProps> = ({ voiceEnabled, onCaptureDone, onCancel
     if (!initSpokenRef.current && voiceEnabled && speechService.isSupported()) {
       initSpokenRef.current = true;
       speechService.speak(
-        'Human scanner initialized. Please position yourself inside the scanning area.'
+        'സ്കാനർ തയ്യാറായി. ഫ്രെയിമിനുള്ളിൽ നിങ്ങളുടെ മുഖം ശരിയായി വയ്ക്കുക.',
+        { language: 'ml-IN', rate: 0.92, pitch: 1 }
       );
     }
 
@@ -46,25 +47,25 @@ const Scanner: React.FC<ScannerProps> = ({ voiceEnabled, onCaptureDone, onCancel
       speechService.stop();
 
       const scanLines = [
-        'Human detected.',
-        'Beginning advanced analysis.',
-        'Analyzing facial geometry.',
-        'Calculating aura levels.',
-        'Checking main character energy.',
-        'Analyzing N P C probability.',
-        'Scanning future career trajectory.',
+        'മുഖം കണ്ടെത്തി.',
+        'വിശദമായ വിശകലനം ആരംഭിക്കുന്നു.',
+        'മുഖത്തിന്റെ ഘടന പരിശോധിക്കുന്നു.',
+        'ഓറ ലെവൽ കണക്കാക്കുന്നു.',
+        'മെയിൻ ക്യാരക്ടർ എനർജി പരിശോധിക്കുന്നു.',
+        'എൻ പി സി സാധ്യത പരിശോധിക്കുന്നു.',
+        'ഭാവിയിലെ കരിയർ സാധ്യത പരിശോധിക്കുന്നു.',
       ];
 
       // Use the speech queue directly rather than raw setTimeouts so lines don't
       // double-fire if the component re-renders while a timer is pending.
       const speakScanSequence = async () => {
         for (let i = 0; i < scanLines.length; i++) {
-          await speechService.speak(scanLines[i]);
+          await speechService.speak(scanLines[i], { language: 'ml-IN', rate: 0.92, pitch: 1 });
           if (i === scanLines.length - 2) {
-            await speechService.speak('Interesting.');
+            await speechService.speak('അത് രസകരമാണ്.', { language: 'ml-IN', rate: 0.92, pitch: 1 });
           }
         }
-        await speechService.speak('Future trajectory unavailable.');
+        await speechService.speak('ഭാവി പ്രവചനം ലഭ്യമല്ല.', { language: 'ml-IN', rate: 0.92, pitch: 1 });
       };
 
       speakScanSequence();

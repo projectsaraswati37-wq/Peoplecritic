@@ -14,6 +14,7 @@ export interface HumanAnalysis {
   id: string;
   scanNumber: number;
   timestamp: Date;
+  source?: 'AI' | 'LOCAL';
 
   // Core stats (7 displayed stats)
   npcLevel: number;           // 0-100
@@ -37,9 +38,23 @@ export interface HumanAnalysis {
   isDemoMode?: boolean;
 }
 
+export interface PoseSnapshot {
+  yaw: number;
+  pitch: number;
+  roll: number;
+}
+
+export interface ScanRecord {
+  id: string;
+  createdAt: string;
+  analysis: HumanAnalysis;
+  thumbnail: string;
+  pose?: PoseSnapshot;
+}
+
 export interface ScanDiagnosticMessage {
   text: string;
   delay: number; // ms from start
 }
 
-export type AppScreen = 'HOME' | 'CAMERA' | 'SCANNING' | 'RESULTS';
+export type AppScreen = 'HOME' | 'CAMERA' | 'SCANNING' | 'RESULTS' | 'HISTORY';

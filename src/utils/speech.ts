@@ -3,14 +3,17 @@ export interface SpeechOptions {
   pitch?: number;
   volume?: number;
   voice?: SpeechSynthesisVoice | null;
+  language?: 'ml-IN' | 'en-US';
 }
 
 class SpeechService {
   private synth: SpeechSynthesis | null = null;
   private enabled = true;
-  private queue: Array<{ text: string; resolve: () => void }> = [];
+  private queue: Array<{ text: string; options: SpeechOptions; resolve: () => void }> = [];
   private speaking = false;
   private preferredVoice: SpeechSynthesisVoice | null = null;
+  private malayalamVoice: SpeechSynthesisVoice | null = null;
+  private currentAudio: HTMLAudioElement | null = null;
   private onSpeakingChange: ((speaking: boolean) => void) | null = null;
 
   constructor() {
@@ -38,10 +41,11 @@ class SpeechService {
           v.name.toLowerCase().includes('microsoft zira'))
     );
     this.preferredVoice = preferred || voices.find((v) => v.lang.startsWith('en')) || null;
+    this.malayalamVoice = voices.find((v) => v.lang.toLowerCase().startsWith('ml')) || null;
   }
 
   isSupported(): boolean {
-    return this.synth !== null;
+    return typeof window !== 'undefined';
   }
 
   setEnabled(enabled: boolean) {
@@ -61,53 +65,91 @@ class SpeechService {
 
   speak(text: string, options: SpeechOptions = {}): Promise<void> {
     return new Promise((resolve) => {
-      if (!this.synth || !this.enabled) {
+      if (!this.enabled) {
         resolve();
         return;
       }
-      this.queue.push({ text, resolve });
+      this.queue.push({ text, options, resolve });
       if (!this.speaking) {
-        this.processQueue(options);
+        this.processQueue();
       }
     });
   }
 
-  private processQueue(options: SpeechOptions = {}) {
+  private processQueue() {
     if (this.queue.length === 0) {
       this.speaking = false;
       this.onSpeakingChange?.(false);
       return;
     }
-    const { text, resolve } = this.queue.shift()!;
+    const { text, options, resolve } = this.queue.shift()!;
     this.speaking = true;
     this.onSpeakingChange?.(true);
 
+    if ((options.language ?? 'en-US') === 'ml-IN') {
+      this.speakNeuralMalayalam(text, options).then(resolve).catch(() => {
+        this.speakWithBrowserVoice(text, options, resolve);
+      });
+      return;
+    }
+
+    this.speakWithBrowserVoice(text, options, resolve);
+  }
+
+  private async speakNeuralMalayalam(text: string, options: SpeechOptions) {
+    const response = await fetch('/api/speech', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, rate: options.rate ?? 0, pitch: options.pitch ?? 0 }),
+    });
+    if (!response.ok) throw new Error('Malayalam neural voice unavailable');
+    const payload = await response.json() as { audio?: string };
+    if (!payload.audio) throw new Error('Malayalam audio was empty');
+    await new Promise<void>((resolve, reject) => {
+      const audio = new Audio(`data:audio/mpeg;base64,${payload.audio}`);
+      this.currentAudio = audio;
+      audio.onended = () => { this.currentAudio = null; this.processQueue(); resolve(); };
+      audio.onerror = () => { this.currentAudio = null; reject(new Error('Audio playback failed')); };
+      audio.play().catch(reject);
+    });
+  }
+
+  private speakWithBrowserVoice(text: string, options: SpeechOptions, resolve: () => void) {
+    if (!this.synth) {
+      resolve();
+      this.processQueue();
+      return;
+    }
+
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.rate = options.rate ?? 0.88;
-    utterance.pitch = options.pitch ?? 0.7;
+    utterance.pitch = options.pitch ?? 1.05;
     utterance.volume = options.volume ?? 1;
-    utterance.voice = options.voice ?? this.preferredVoice;
+    utterance.lang = options.language ?? 'en-US';
+    utterance.voice = options.voice ?? (options.language === 'en-US' ? this.preferredVoice : this.malayalamVoice);
 
     utterance.onend = () => {
       resolve();
-      this.processQueue(options);
+      this.processQueue();
     };
     utterance.onerror = () => {
       resolve();
-      this.processQueue(options);
+      this.processQueue();
     };
 
     try {
       this.synth!.speak(utterance);
     } catch {
       resolve();
-      this.processQueue(options);
+      this.processQueue();
     }
   }
 
   stop() {
     this.queue = [];
     this.speaking = false;
+    this.currentAudio?.pause();
+    this.currentAudio = null;
     this.onSpeakingChange?.(false);
     try {
       this.synth?.cancel();

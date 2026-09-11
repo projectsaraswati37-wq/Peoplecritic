@@ -2,8 +2,12 @@ import React, { useState, useCallback } from 'react';
 import Home from './pages/Home';
 import Scanner from './pages/Scanner';
 import AnalysisResults from './components/AnalysisResults';
-import type { HumanAnalysis, AppScreen } from './types/analysis';
+import CriticCompanion from './components/CriticCompanion';
+import History from './pages/History';
+import type { HumanAnalysis, AppScreen, ScanRecord } from './types/analysis';
 import { generateHumanAnalysis } from './utils/analysisGenerator';
+import { analyzeWithGemini } from './utils/gemini';
+import { loadScanHistory, saveScanRecord } from './utils/history';
 import { speechService } from './utils/speech';
 
 const App: React.FC = () => {
@@ -13,6 +17,7 @@ const App: React.FC = () => {
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [scanCount, setScanCount] = useState(0);
   const [demoMode, setDemoMode] = useState(false);
+  const [history, setHistory] = useState<ScanRecord[]>(() => loadScanHistory());
 
   const handleVoiceToggle = useCallback(() => {
     const next = !voiceEnabled;
@@ -27,13 +32,17 @@ const App: React.FC = () => {
     setScreen('CAMERA');
   }, []);
 
-  const handleCaptureDone = useCallback((imageDataUrl: string) => {
+  const handleCaptureDone = useCallback(async (imageDataUrl: string) => {
     setCapturedImage(imageDataUrl);
-    const result = generateHumanAnalysis(demoMode);
+    const nextScanNumber = scanCount + 1;
+    const result = demoMode
+      ? generateHumanAnalysis(true)
+      : await analyzeWithGemini(imageDataUrl, nextScanNumber).catch(() => null) ?? generateHumanAnalysis(false);
     setAnalysis(result);
+    setHistory(saveScanRecord(result, imageDataUrl));
     setScanCount((c) => c + 1);
     setScreen('RESULTS');
-  }, [demoMode]);
+  }, [demoMode, scanCount]);
 
   const handleScanAgain = useCallback(() => {
     speechService.stop();
@@ -54,6 +63,18 @@ const App: React.FC = () => {
     setScreen('HOME');
   }, []);
 
+  const handleOpenHistory = useCallback(() => {
+    speechService.stop();
+    setScreen('HISTORY');
+  }, []);
+
+  const handleOpenRecord = useCallback((record: ScanRecord) => {
+    speechService.stop();
+    setAnalysis(record.analysis);
+    setCapturedImage(record.thumbnail);
+    setScreen('RESULTS');
+  }, []);
+
   return (
     <div className="min-h-screen bg-cyber-bg">
       {screen === 'HOME' && (
@@ -62,14 +83,18 @@ const App: React.FC = () => {
           onVoiceToggle={handleVoiceToggle}
           onStart={handleStart}
           scanCount={scanCount}
+            onHistory={handleOpenHistory}
         />
       )}
       {(screen === 'CAMERA' || screen === 'SCANNING') && (
-        <Scanner
-          voiceEnabled={voiceEnabled}
-          onCaptureDone={handleCaptureDone}
-          onCancel={handleCancel}
-        />
+        <div className="operational-shell">
+          <Scanner
+            voiceEnabled={voiceEnabled}
+            onCaptureDone={handleCaptureDone}
+            onCancel={handleCancel}
+          />
+          <CriticCompanion context={screen === 'SCANNING' ? 'scanning' : 'camera'} />
+        </div>
       )}
       {screen === 'RESULTS' && analysis && (
         <AnalysisResults
@@ -79,6 +104,16 @@ const App: React.FC = () => {
           onVoiceToggle={handleVoiceToggle}
           onScanAgain={handleScanAgain}
           onHome={handleHome}
+          onHistory={handleOpenHistory}
+        />
+      )}
+      {screen === 'RESULTS' && analysis && <CriticCompanion context="results" verdict={analysis.verdict} />}
+      {screen === 'HISTORY' && (
+        <History
+          records={history}
+          onBack={handleHome}
+          onOpen={handleOpenRecord}
+          onClear={() => setHistory([])}
         />
       )}
     </div>
